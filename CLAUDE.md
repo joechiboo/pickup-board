@@ -21,3 +21,26 @@
 2. PWA / 加到主畫面、Supabase Realtime 自動更新
 
 Supabase 已於 2026-07-15 串接完成(專案 fyfmhdoluahjvncmgcaq,region Asia-Pacific,`boards` 表單 row)。建置流程紀錄在 `supabase/SETUP.md`。
+
+## 幫使用者登打行程到 Supabase(自然語言 → 資料)
+
+使用者會用口語描述行程(例:「老大週一三五早上游泳營,爸爸送奶奶接」),請整理成 activity 物件寫入。連線資訊都在 `src/config.js`(SUPABASE_URL、SUPABASE_ANON_KEY、BOARD_ID)。
+
+**⚠ 整個看板存在一個 row 的 `data` 欄位,必須先讀、合併、再寫回,直接覆蓋會弄丟既有活動:**
+
+```bash
+KEY=$(grep -o 'sb_publishable_[A-Za-z0-9_]*' src/config.js)
+URL=https://fyfmhdoluahjvncmgcaq.supabase.co
+BOARD=214215b4ab10445da370077a3d789b7d028d62ba
+
+# 1. 讀出現況
+curl -s "$URL/rest/v1/boards?id=eq.$BOARD&select=data" -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
+
+# 2. 在既有 data.activities 陣列後面 append 新活動(id 用 "a" + 任意唯一字串),整包寫回
+curl -s -X POST "$URL/rest/v1/boards?on_conflict=id" \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" -H "Prefer: resolution=merge-duplicates" \
+  -d '[{"id":"'$BOARD'","data":{...合併後的完整 data...}}]'
+```
+
+activity 欄位:`kidId`(k1=老大/k2=老二)、`title`、`days`(0=日...6=六 的陣列)、`start`/`end`(HH:MM)、`location`、`dropoff`/`pickup`(誰送/誰接)、`from`/`to`(YYYY-MM-DD,選填,梯次起訖)、`note`(選填)。登打完請使用者重新整理網頁確認。
