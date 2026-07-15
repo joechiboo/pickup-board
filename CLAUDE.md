@@ -17,10 +17,7 @@
 
 ## 下一步(優先序)
 
-1. **完成 Supabase 串接**(程式已寫好,只差設定):
-   - 使用者提供 Supabase Project URL + anon key → 填入 `src/config.js`
-   - 在 Supabase Dashboard → SQL Editor 執行 `supabase/schema.sql`
-   - `npm run deploy`(雲端 session 沒法跑 gh-pages 的話,請使用者回桌機跑,或直接 push main 請桌機 session 部署)
-   - 驗證:開 <https://joechiboo.github.io/pickup-board/> 在 A 裝置新增活動,B 裝置重新整理看得到
-2. 輸入實際兩個小孩的暑期行程
-3. PWA / 加到主畫面、Supabase Realtime 自動更新
+1. 輸入實際兩個小孩的暑期行程(在網頁「管理」頁直接輸入即可,存進 Supabase 全家共享)
+2. PWA / 加到主畫面、Supabase Realtime 自動更新
+
+Supabase 已於 2026-07-15 串接完成(專案 fyfmhdoluahjvncmgcaq,region Asia-Pacific,`boards` 表單 row)。建置流程紀錄在 `supabase/SETUP.md`。

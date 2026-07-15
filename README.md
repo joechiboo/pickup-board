@@ -41,7 +41,7 @@ npm run deploy
 
 ## Roadmap
 
-- [ ] **完成 Supabase 串接**(程式已備好,差:填 config、跑 schema.sql、deploy)
+- [x] **完成 Supabase 串接**(2026-07-15,專案 fyfmhdoluahjvncmgcaq,REST 讀寫驗證通過)
 - [ ] 輸入實際兩個小孩的暑期行程
 - [ ] Supabase Realtime:開著的頁面自動更新
 - [ ] PWA:加到主畫面、離線可看
