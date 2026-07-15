@@ -27,13 +27,25 @@ const toMin = (t) => {
   return h * 60 + m;
 };
 
+const toDS = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 function activeOnDate(act, date) {
   if (!act.days.includes(date.getDay())) return false;
-  const ds = date.toISOString().slice(0, 10);
+  const ds = toDS(date);
   if (act.from && ds < act.from) return false;
   if (act.to && ds > act.to) return false;
   return true;
 }
+
+// 單日提醒:activity 可掛 alerts:[{date:"YYYY-MM-DD", note:"原因"}],當天卡片變淡紅
+function alertOnDate(act, date) {
+  const ds = toDS(date);
+  return (act.alerts || []).find((al) => al.date === ds) || null;
+}
+
+const ALERT_BG = "#FDECEC";
+const ALERT_COLOR = "#B00020";
 
 // ===== 主元件 =====
 export default function App() {
@@ -184,28 +196,36 @@ function TodayView({ date, dayOffset, setDayOffset, data, kidColor }) {
               {acts.length === 0 && (
                 <div style={{ padding: 18, fontSize: 17, color: "#999" }}>今天沒有安排 🎉</div>
               )}
-              {acts.map((a, i) => (
-                <div
-                  key={a.id}
-                  style={{
-                    padding: "14px 16px",
-                    borderTop: i > 0 ? "1px solid #EEE" : "none",
-                    background: i % 2 ? c.soft : "#fff",
-                  }}
-                >
-                  <div style={{ fontSize: 19, fontWeight: 800 }}>
-                    {a.start}–{a.end}　{a.title}
+              {acts.map((a, i) => {
+                const alert = alertOnDate(a, date);
+                return (
+                  <div
+                    key={a.id}
+                    style={{
+                      padding: "14px 16px",
+                      borderTop: i > 0 ? "1px solid #EEE" : "none",
+                      background: alert ? ALERT_BG : i % 2 ? c.soft : "#fff",
+                    }}
+                  >
+                    <div style={{ fontSize: 19, fontWeight: 800 }}>
+                      {a.start}–{a.end}　{a.title}
+                    </div>
+                    {alert && (
+                      <div style={{ fontSize: 17, marginTop: 4, color: ALERT_COLOR, fontWeight: 800 }}>
+                        ❗ {alert.note}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 17, marginTop: 4, color: "#444" }}>📍 {a.location || "—"}</div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                      <Badge label="送" who={a.dropoff} color={c.main} />
+                      <Badge label="接" who={a.pickup} color="#B54A1F" />
+                    </div>
+                    {a.note && (
+                      <div style={{ fontSize: 15, marginTop: 6, color: "#8A6D1A" }}>⚠ {a.note}</div>
+                    )}
                   </div>
-                  <div style={{ fontSize: 17, marginTop: 4, color: "#444" }}>📍 {a.location || "—"}</div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                    <Badge label="送" who={a.dropoff} color={c.main} />
-                    <Badge label="接" who={a.pickup} color="#B54A1F" />
-                  </div>
-                  {a.note && (
-                    <div style={{ fontSize: 15, marginTop: 6, color: "#8A6D1A" }}>⚠ {a.note}</div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         );
@@ -286,6 +306,7 @@ function WeekView({ data, kidColor, kidName }) {
             <div style={{ background: "#fff", border: "1px solid #E3E5E1", borderRadius: 12, overflow: "hidden" }}>
               {acts.map((a, i) => {
                 const c = kidColor(a.kidId);
+                const alert = alertOnDate(a, d);
                 return (
                   <div
                     key={a.id}
@@ -296,6 +317,7 @@ function WeekView({ data, kidColor, kidName }) {
                       padding: "10px 12px",
                       borderTop: i > 0 ? "1px solid #EEE" : "none",
                       fontSize: 16,
+                      background: alert ? ALERT_BG : "#fff",
                     }}
                   >
                     <span
@@ -316,6 +338,9 @@ function WeekView({ data, kidColor, kidName }) {
                     <span style={{ flex: 1 }}>
                       {a.title}
                       <span style={{ color: "#888" }}>｜送:{a.dropoff || "?"} 接:{a.pickup || "?"}</span>
+                      {alert && (
+                        <div style={{ color: ALERT_COLOR, fontWeight: 700 }}>❗ {alert.note}</div>
+                      )}
                     </span>
                   </div>
                 );
@@ -350,6 +375,8 @@ function ShareView({ data }) {
       out += `\n【${kid.name}】\n`;
       for (const a of acts) {
         out += `🕒 ${a.start}–${a.end} ${a.title}\n`;
+        const alert = alertOnDate(a, date);
+        if (alert) out += `❗ ${alert.note}\n`;
         if (a.location) out += `📍 ${a.location}\n`;
         out += `🚗 送:${a.dropoff || "未定"}｜接:${a.pickup || "未定"}\n`;
         if (a.note) out += `⚠️ ${a.note}\n`;
