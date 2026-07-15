@@ -17,8 +17,11 @@
 
 ## 下一步(優先序)
 
-1. 輸入實際兩個小孩的暑期行程(在網頁「管理」頁直接輸入即可,存進 Supabase 全家共享)
-2. PWA / 加到主畫面、Supabase Realtime 自動更新
+1. 補齊行程:家一五筆已登打(夏令營各筆的誰送/誰接還是「未定」),家禾(k2)行程全空
+2. 隱私強化(方案已定,見 README roadmap):讀取改走 RPC + BOARD_ID 搬進網址 hash
+3. PWA / 加到主畫面、Supabase Realtime 自動更新
+
+地點寫法慣例:公開場館寫全名(文山劇場),私人地點用家人才懂的暗語(姑婆婆家、新店・民權路),完整地址放家庭 LINE 群記事本。第三方個資(教練電話等)不進看板。
 
 Supabase 已於 2026-07-15 串接完成(專案 fyfmhdoluahjvncmgcaq,region Asia-Pacific,`boards` 表單 row)。建置流程紀錄在 `supabase/SETUP.md`。
 

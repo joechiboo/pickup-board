@@ -43,6 +43,7 @@ npm run deploy
 
 - [x] **完成 Supabase 串接**(2026-07-15,專案 fyfmhdoluahjvncmgcaq,REST 讀寫驗證通過)
 - [ ] 輸入實際兩個小孩的暑期行程
+- [ ] 隱私強化:讀取改走 Postgres RPC(拒絕直接 select),BOARD_ID 從 config.js 搬到網址 `#` 參數(只活在 LINE 群的連結裡,不進 repo/bundle)
 - [ ] Supabase Realtime:開著的頁面自動更新
 - [ ] PWA:加到主畫面、離線可看
 - [ ] 「今日異動」提醒(例:今天改由爺爺接)
