@@ -38,7 +38,8 @@ function activeOnDate(act, date) {
   return true;
 }
 
-// 單日提醒:activity 可掛 alerts:[{date:"YYYY-MM-DD", note:"原因"}],當天卡片變淡紅
+// 單日提醒:activity 可掛 alerts:[{date:"YYYY-MM-DD", note:"原因", part?:"dropoff"|"pickup"}]
+// 沒有 part 整張卡片變淡紅;有 part 只有該段(送或接)標紅
 function alertOnDate(act, date) {
   const ds = toDS(date);
   return (act.alerts || []).find((al) => al.date === ds) || null;
@@ -198,13 +199,14 @@ function TodayView({ date, dayOffset, setDayOffset, data, kidColor }) {
               )}
               {acts.map((a, i) => {
                 const alert = alertOnDate(a, date);
+                const wholeAlert = alert && !alert.part;
                 return (
                   <div
                     key={a.id}
                     style={{
                       padding: "14px 16px",
                       borderTop: i > 0 ? "1px solid #EEE" : "none",
-                      background: alert ? ALERT_BG : i % 2 ? c.soft : "#fff",
+                      background: wholeAlert ? ALERT_BG : i % 2 ? c.soft : "#fff",
                     }}
                   >
                     <div style={{ fontSize: 19, fontWeight: 800 }}>
@@ -217,8 +219,18 @@ function TodayView({ date, dayOffset, setDayOffset, data, kidColor }) {
                     )}
                     <div style={{ fontSize: 17, marginTop: 4, color: "#444" }}>📍 {a.location || "—"}</div>
                     <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                      <Badge label="送" who={a.dropoff} color={c.main} />
-                      <Badge label="接" who={a.pickup} color="#B54A1F" />
+                      <Badge
+                        label="送"
+                        who={a.dropoff}
+                        color={alert?.part === "dropoff" ? ALERT_COLOR : c.main}
+                        highlight={alert?.part === "dropoff"}
+                      />
+                      <Badge
+                        label="接"
+                        who={a.pickup}
+                        color={alert?.part === "pickup" ? ALERT_COLOR : "#B54A1F"}
+                        highlight={alert?.part === "pickup"}
+                      />
                     </div>
                     {a.note && (
                       <div style={{ fontSize: 15, marginTop: 6, color: "#8A6D1A" }}>⚠ {a.note}</div>
@@ -234,7 +246,7 @@ function TodayView({ date, dayOffset, setDayOffset, data, kidColor }) {
   );
 }
 
-function Badge({ label, who, color }) {
+function Badge({ label, who, color, highlight }) {
   return (
     <div
       style={{
@@ -248,7 +260,9 @@ function Badge({ label, who, color }) {
       }}
     >
       <span style={{ background: color, color: "#fff", padding: "3px 10px" }}>{label}</span>
-      <span style={{ padding: "3px 12px", color }}>{who || "未定"}</span>
+      <span style={{ padding: "3px 12px", color, background: highlight ? ALERT_BG : "transparent" }}>
+        {highlight ? "❗" : ""}{who || "未定"}
+      </span>
     </div>
   );
 }
@@ -307,6 +321,8 @@ function WeekView({ data, kidColor, kidName }) {
               {acts.map((a, i) => {
                 const c = kidColor(a.kidId);
                 const alert = alertOnDate(a, d);
+                const mark = (part) =>
+                  alert?.part === part ? { color: ALERT_COLOR, fontWeight: 800 } : {};
                 return (
                   <div
                     key={a.id}
@@ -317,7 +333,7 @@ function WeekView({ data, kidColor, kidName }) {
                       padding: "10px 12px",
                       borderTop: i > 0 ? "1px solid #EEE" : "none",
                       fontSize: 16,
-                      background: alert ? ALERT_BG : "#fff",
+                      background: alert && !alert.part ? ALERT_BG : "#fff",
                     }}
                   >
                     <span
@@ -337,7 +353,10 @@ function WeekView({ data, kidColor, kidName }) {
                     </span>
                     <span style={{ flex: 1 }}>
                       {a.title}
-                      <span style={{ color: "#888" }}>｜送:{a.dropoff || "?"} 接:{a.pickup || "?"}</span>
+                      <span style={{ color: "#888" }}>
+                        ｜<span style={mark("dropoff")}>送:{a.dropoff || "?"}</span>{" "}
+                        <span style={mark("pickup")}>接:{a.pickup || "?"}</span>
+                      </span>
                       {alert && (
                         <div style={{ color: ALERT_COLOR, fontWeight: 700 }}>❗ {alert.note}</div>
                       )}
