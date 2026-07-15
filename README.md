@@ -29,14 +29,20 @@ npm run deploy
 
 ## 資料儲存
 
-目前存 **localStorage(單機)**,尚未跨裝置共享。存取層抽在 [src/storage.js](src/storage.js),之後換共享後端只改這個檔案。
+**Supabase**(`boards` 表,單 row 存整包 JSON)+ localStorage 當快取/斷網 fallback。存取層在 [src/storage.js](src/storage.js)。
+
+啟用步驟:
+
+1. 在 Supabase SQL Editor 執行 [supabase/schema.sql](supabase/schema.sql)
+2. 把 Project URL 和 anon key 填進 [src/config.js](src/config.js)
+3. `npm run deploy`
+
+`config.js` 留空時自動退回 localStorage 單機模式,網站照常運作。
 
 ## Roadmap
 
-- [ ] **跨裝置共享資料**(關鍵!目前只有分享文字可跨裝置)— 候選方案:
-  - 行程 JSON 放 repo、改資料走 commit(免後端,爸媽用 Claude/GitHub 改)
-  - Firebase Realtime DB / Supabase(免費額度夠,即時同步)
-  - GitHub Gist 當後端(token 管理較麻煩)
+- [ ] **完成 Supabase 串接**(程式已備好,差:填 config、跑 schema.sql、deploy)
 - [ ] 輸入實際兩個小孩的暑期行程
+- [ ] Supabase Realtime:開著的頁面自動更新
 - [ ] PWA:加到主畫面、離線可看
 - [ ] 「今日異動」提醒(例:今天改由爺爺接)
