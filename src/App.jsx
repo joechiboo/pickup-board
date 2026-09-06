@@ -55,6 +55,11 @@ function whoOn(act, alert) {
   };
 }
 
+// 整筆停課/請假(整格標紅+刪除線)。只覆寫送接、或只標某一段的不算
+function isOff(alert) {
+  return !!(alert && alert.note && !alert.part && !alert.dropoff && !alert.pickup);
+}
+
 const ALERT_BG = "#FDECEC";
 const ALERT_COLOR = "#B00020";
 
@@ -137,7 +142,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ padding: 16, maxWidth: 560, margin: "0 auto" }}>
+      <div style={{ padding: 16, maxWidth: tab === "table" ? 960 : 560, margin: "0 auto" }}>
         {tab === "today" && (
           <TodayView
             date={viewDate}
@@ -212,7 +217,7 @@ function TodayView({ date, dayOffset, setDayOffset, data, kidColor }) {
               {acts.map((a, i) => {
                 const alert = alertOnDate(a, date);
                 const who = whoOn(a, alert);
-                const wholeAlert = alert && !alert.part;
+                const wholeAlert = isOff(alert);
                 return (
                   <div
                     key={a.id}
@@ -347,7 +352,7 @@ function WeekView({ data, kidColor, kidName }) {
                       padding: "10px 12px",
                       borderTop: i > 0 ? "1px solid #EEE" : "none",
                       fontSize: 16,
-                      background: alert && !alert.part ? ALERT_BG : "#fff",
+                      background: isOff(alert) ? ALERT_BG : "#fff",
                     }}
                   >
                     <span
@@ -411,8 +416,60 @@ const tdStyle = {
   lineHeight: 1.5,
 };
 
+function useNarrow(maxWidth = 760) {
+  const [narrow, setNarrow] = useState(
+    typeof window !== "undefined" ? window.innerWidth <= maxWidth : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${maxWidth}px)`);
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [maxWidth]);
+  return narrow;
+}
+
+// 一格/一列裡的活動清單(表格與手機卡片共用)
+function ActList({ acts, date }) {
+  if (acts.length === 0) return <span style={{ color: "#CCC" }}>—</span>;
+  return acts.map((a) => {
+    const al = alertOnDate(a, date);
+    const w = whoOn(a, al);
+    const off = isOff(al);
+    return (
+      <div key={a.id} style={{ marginBottom: 5 }}>
+        <span
+          style={{
+            fontWeight: 700,
+            color: off ? "#999" : "#222",
+            textDecoration: off ? "line-through" : "none",
+          }}
+        >
+          {a.start ? `${a.start}${a.end ? "\u2013" + a.end : ""} ` : ""}
+          {a.title}
+        </span>
+        {(w.dropoff || w.pickup) && (
+          <span
+            style={{
+              color: (al && al.part) || w.dropChanged || w.pickChanged ? ALERT_COLOR : "#666",
+            }}
+          >
+            {w.dropoff ? ` 送:${w.dropoff}` : ""}
+            {w.pickup ? ` 接:${w.pickup}` : ""}
+          </span>
+        )}
+        {al?.note && (
+          <div style={{ color: ALERT_COLOR, fontWeight: 700, fontSize: 14 }}>❗{al.note}</div>
+        )}
+      </div>
+    );
+  });
+}
+
 function TableView({ data }) {
   const [weekOffset, setWeekOffset] = useState(0);
+  const narrow = useNarrow();
   const today = new Date();
   const start = new Date(today);
   start.setDate(today.getDate() + weekOffset * 7);
@@ -422,28 +479,119 @@ function TableView({ data }) {
     return d;
   });
   const dayNotes = data.dayNotes || {};
+  const actsOf = (kidId, d) =>
+    data.activities
+      .filter((a) => a.kidId === kidId && activeOnDate(a, d))
+      .sort((a, b) => toMin(a.start) - toMin(b.start));
 
+  const nav = (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+      <NavBtn onClick={() => setWeekOffset(weekOffset - 1)}>‹ 前一週</NavBtn>
+      <div style={{ fontSize: 16, fontWeight: 800 }}>
+        {fmtDate(days[0])} – {fmtDate(days[13])}
+      </div>
+      <NavBtn onClick={() => setWeekOffset(weekOffset + 1)}>後一週 ›</NavBtn>
+    </div>
+  );
+
+  // 手機:每天一張卡片(不需要橫向捲動)
+  if (narrow) {
+    return (
+      <div>
+        {nav}
+        {days.map((d) => {
+          const ds = toDS(d);
+          const isToday = d.toDateString() === today.toDateString();
+          const note = dayNotes[ds];
+          const rows = data.kids
+            .map((k, i) => ({ kid: k, i, acts: actsOf(k.id, d) }))
+            .filter((r) => r.acts.length > 0);
+          return (
+            <div
+              key={ds}
+              style={{
+                marginBottom: 12,
+                background: "#fff",
+                border: `1px solid ${isToday ? "#B54A1F" : "#E3E5E1"}`,
+                borderRadius: 12,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  background: isToday ? "#FFF3D6" : "#F0F2EF",
+                  padding: "8px 12px",
+                  fontSize: 17,
+                  fontWeight: 800,
+                }}
+              >
+                {d.getMonth() + 1}/{d.getDate()}（{DAY_LABELS[d.getDay()]}）
+                {isToday && <span style={{ color: "#B54A1F" }}> ← 今天</span>}
+              </div>
+              {rows.length === 0 && !note && (
+                <div style={{ padding: "10px 12px", color: "#AAA", fontSize: 15 }}>沒有安排</div>
+              )}
+              {rows.map(({ kid, i, acts }) => (
+                <div
+                  key={kid.id}
+                  style={{ display: "flex", gap: 10, padding: "10px 12px", borderTop: "1px solid #EEE" }}
+                >
+                  <span
+                    style={{
+                      background: KID_COLORS[i % KID_COLORS.length].main,
+                      color: "#fff",
+                      borderRadius: 6,
+                      padding: "2px 8px",
+                      fontWeight: 700,
+                      fontSize: 15,
+                      height: "fit-content",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {kid.name}
+                  </span>
+                  <div style={{ flex: 1, fontSize: 16, lineHeight: 1.5 }}>
+                    <ActList acts={acts} date={d} />
+                  </div>
+                </div>
+              ))}
+              {note && (
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    borderTop: "1px solid #EEE",
+                    background: "#FFFDF5",
+                    color: "#8A6D1A",
+                    fontSize: 15,
+                  }}
+                >
+                  {note.split("\n").map((t, i) => (
+                    <div key={i}>📝 {t}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // 寬螢幕:真表格
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <NavBtn onClick={() => setWeekOffset(weekOffset - 1)}>‹ 前一週</NavBtn>
-        <div style={{ fontSize: 16, fontWeight: 800 }}>
-          {fmtDate(days[0])} – {fmtDate(days[13])}
-        </div>
-        <NavBtn onClick={() => setWeekOffset(weekOffset + 1)}>後一週 ›</NavBtn>
-      </div>
-
-      <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E3E5E1", borderRadius: 12 }}>
-        <table style={{ borderCollapse: "collapse", minWidth: 620, width: "100%" }}>
+      {nav}
+      <div style={{ background: "#fff", border: "1px solid #E3E5E1", borderRadius: 12, overflow: "hidden" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
           <thead>
             <tr style={{ background: "#F0F2EF" }}>
-              <th style={thStyle(58)}>日期</th>
+              <th style={thStyle(70)}>日期</th>
               {data.kids.map((k, i) => (
                 <th key={k.id} style={{ ...thStyle(), color: KID_COLORS[i % KID_COLORS.length].main }}>
                   {k.name}
                 </th>
               ))}
-              <th style={thStyle(120)}>備註</th>
+              <th style={thStyle(170)}>備註</th>
             </tr>
           </thead>
           <tbody>
@@ -455,71 +603,31 @@ function TableView({ data }) {
               return (
                 <tr key={ds} style={{ background: isToday ? "#FFF9E0" : weekend ? "#FAFAF8" : "#fff" }}>
                   <td style={{ ...tdStyle, fontWeight: 800, whiteSpace: "nowrap", textAlign: "center" }}>
-                    <div style={{ fontSize: 16 }}>{d.getMonth() + 1}/{d.getDate()}</div>
+                    <div style={{ fontSize: 16 }}>
+                      {d.getMonth() + 1}/{d.getDate()}
+                    </div>
                     <div style={{ fontSize: 13, color: isToday ? "#B54A1F" : "#777" }}>
-                      {DAY_LABELS[wd]}{isToday ? " 今天" : ""}
+                      {DAY_LABELS[wd]}
+                      {isToday ? " 今天" : ""}
                     </div>
                   </td>
-                  {data.kids.map((k) => {
-                    const acts = data.activities
-                      .filter((a) => a.kidId === k.id && activeOnDate(a, d))
-                      .sort((a, b) => toMin(a.start) - toMin(b.start));
-                    return (
-                      <td key={k.id} style={tdStyle}>
-                        {acts.length === 0 && <span style={{ color: "#CCC" }}>—</span>}
-                        {acts.map((a) => {
-                          const al = alertOnDate(a, d);
-                          const w = whoOn(a, al);
-                          const off = al && !al.part;
-                          return (
-                            <div key={a.id} style={{ marginBottom: 5 }}>
-                              <span
-                                style={{
-                                  fontWeight: 700,
-                                  color: off ? "#999" : "#222",
-                                  textDecoration: off ? "line-through" : "none",
-                                }}
-                              >
-                                {a.start ? `${a.start}${a.end ? "\u2013" + a.end : ""} ` : ""}
-                                {a.title}
-                              </span>
-                              {(w.dropoff || w.pickup) && (
-                                <span
-                                  style={{
-                                    color:
-                                      (al && al.part) || w.dropChanged || w.pickChanged
-                                        ? ALERT_COLOR
-                                        : "#666",
-                                  }}
-                                >
-                                  {w.dropoff ? ` 送:${w.dropoff}` : ""}
-                                  {w.pickup ? ` 接:${w.pickup}` : ""}
-                                </span>
-                              )}
-                              {al?.note && (
-                                <div style={{ color: ALERT_COLOR, fontWeight: 700, fontSize: 14 }}>
-                                  ❗{al.note}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </td>
-                    );
-                  })}
+                  {data.kids.map((k) => (
+                    <td key={k.id} style={tdStyle}>
+                      <ActList acts={actsOf(k.id, d)} date={d} />
+                    </td>
+                  ))}
                   <td style={{ ...tdStyle, color: "#8A6D1A" }}>
-                    {dayNotes[ds]
-                      ? dayNotes[ds].split("\n").map((t, i) => <div key={i}>{t}</div>)
-                      : <span style={{ color: "#DDD" }}>—</span>}
+                    {dayNotes[ds] ? (
+                      dayNotes[ds].split("\n").map((t, i) => <div key={i}>{t}</div>)
+                    ) : (
+                      <span style={{ color: "#DDD" }}>—</span>
+                    )}
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-      </div>
-      <div style={{ fontSize: 13, color: "#999", marginTop: 8 }}>
-        表格可左右滑動。灰色刪除線＝當天停課/請假,紅字為當天特別提醒。
       </div>
     </div>
   );
