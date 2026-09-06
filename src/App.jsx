@@ -45,6 +45,16 @@ function alertOnDate(act, date) {
   return (act.alerts || []).find((al) => al.date === ds) || null;
 }
 
+// 單日覆寫送/接:alerts[].dropoff / alerts[].pickup(沒填就用活動本身的)
+function whoOn(act, alert) {
+  return {
+    dropoff: (alert && alert.dropoff) || act.dropoff,
+    pickup: (alert && alert.pickup) || act.pickup,
+    dropChanged: !!(alert && alert.dropoff),
+    pickChanged: !!(alert && alert.pickup),
+  };
+}
+
 const ALERT_BG = "#FDECEC";
 const ALERT_COLOR = "#B00020";
 
@@ -101,6 +111,7 @@ export default function App() {
           {[
             ["today", "今天"],
             ["week", "本週"],
+            ["table", "表格"],
             ["share", "分享"],
             ["manage", "管理"],
           ].map(([key, label]) => (
@@ -110,7 +121,7 @@ export default function App() {
               style={{
                 flex: key === "manage" ? 0.7 : 1,
                 padding: "10px 0",
-                fontSize: 17,
+                fontSize: 16,
                 fontWeight: tab === key ? 700 : 500,
                 fontFamily: font,
                 color: tab === key ? "#1F5FA8" : "#777",
@@ -137,6 +148,7 @@ export default function App() {
           />
         )}
         {tab === "week" && <WeekView data={data} kidColor={kidColor} kidName={kidName} />}
+        {tab === "table" && <TableView data={data} />}
         {tab === "share" && <ShareView data={data} />}
         {tab === "manage" && (
           <ManageView
@@ -199,6 +211,7 @@ function TodayView({ date, dayOffset, setDayOffset, data, kidColor }) {
               )}
               {acts.map((a, i) => {
                 const alert = alertOnDate(a, date);
+                const who = whoOn(a, alert);
                 const wholeAlert = alert && !alert.part;
                 return (
                   <div
@@ -212,7 +225,7 @@ function TodayView({ date, dayOffset, setDayOffset, data, kidColor }) {
                     <div style={{ fontSize: 19, fontWeight: 800 }}>
                       {a.start}–{a.end}　{a.title}
                     </div>
-                    {alert && (
+                    {alert?.note && (
                       <div style={{ fontSize: 17, marginTop: 4, color: ALERT_COLOR, fontWeight: 800 }}>
                         ❗ {alert.note}
                       </div>
@@ -221,15 +234,15 @@ function TodayView({ date, dayOffset, setDayOffset, data, kidColor }) {
                     <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                       <Badge
                         label="送"
-                        who={a.dropoff}
-                        color={alert?.part === "dropoff" ? ALERT_COLOR : c.main}
-                        highlight={alert?.part === "dropoff"}
+                        who={who.dropoff}
+                        color={alert?.part === "dropoff" || who.dropChanged ? ALERT_COLOR : c.main}
+                        highlight={alert?.part === "dropoff" || who.dropChanged}
                       />
                       <Badge
                         label="接"
-                        who={a.pickup}
-                        color={alert?.part === "pickup" ? ALERT_COLOR : "#B54A1F"}
-                        highlight={alert?.part === "pickup"}
+                        who={who.pickup}
+                        color={alert?.part === "pickup" || who.pickChanged ? ALERT_COLOR : "#B54A1F"}
+                        highlight={alert?.part === "pickup" || who.pickChanged}
                       />
                     </div>
                     {a.note && (
@@ -321,8 +334,9 @@ function WeekView({ data, kidColor, kidName }) {
               {acts.map((a, i) => {
                 const c = kidColor(a.kidId);
                 const alert = alertOnDate(a, d);
-                const mark = (part) =>
-                  alert?.part === part ? { color: ALERT_COLOR, fontWeight: 800 } : {};
+                const who = whoOn(a, alert);
+                const mark = (part, changed) =>
+                  alert?.part === part || changed ? { color: ALERT_COLOR, fontWeight: 800 } : {};
                 return (
                   <div
                     key={a.id}
@@ -354,10 +368,10 @@ function WeekView({ data, kidColor, kidName }) {
                     <span style={{ flex: 1 }}>
                       {a.title}
                       <span style={{ color: "#888" }}>
-                        ｜<span style={mark("dropoff")}>送:{a.dropoff || "?"}</span>{" "}
-                        <span style={mark("pickup")}>接:{a.pickup || "?"}</span>
+                        ｜<span style={mark("dropoff", who.dropChanged)}>送:{who.dropoff || "?"}</span>{" "}
+                        <span style={mark("pickup", who.pickChanged)}>接:{who.pickup || "?"}</span>
                       </span>
-                      {alert && (
+                      {alert?.note && (
                         <div style={{ color: ALERT_COLOR, fontWeight: 700 }}>❗ {alert.note}</div>
                       )}
                     </span>
@@ -373,6 +387,140 @@ function WeekView({ data, kidColor, kidName }) {
           還沒有任何活動,到「管理」新增
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ===== 表格(日期 × 小孩 + 每日備註) =====
+const thStyle = (w) => ({
+  padding: "8px 10px",
+  fontSize: 15,
+  fontWeight: 800,
+  textAlign: "left",
+  borderBottom: "2px solid #DDD",
+  whiteSpace: "nowrap",
+  ...(w ? { width: w } : {}),
+});
+
+const tdStyle = {
+  padding: "8px 10px",
+  borderBottom: "1px solid #EEE",
+  verticalAlign: "top",
+  fontSize: 15,
+  lineHeight: 1.5,
+};
+
+function TableView({ data }) {
+  const [weekOffset, setWeekOffset] = useState(0);
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(today.getDate() + weekOffset * 7);
+  const days = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    return d;
+  });
+  const dayNotes = data.dayNotes || {};
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <NavBtn onClick={() => setWeekOffset(weekOffset - 1)}>‹ 前一週</NavBtn>
+        <div style={{ fontSize: 16, fontWeight: 800 }}>
+          {fmtDate(days[0])} – {fmtDate(days[13])}
+        </div>
+        <NavBtn onClick={() => setWeekOffset(weekOffset + 1)}>後一週 ›</NavBtn>
+      </div>
+
+      <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E3E5E1", borderRadius: 12 }}>
+        <table style={{ borderCollapse: "collapse", minWidth: 620, width: "100%" }}>
+          <thead>
+            <tr style={{ background: "#F0F2EF" }}>
+              <th style={thStyle(58)}>日期</th>
+              {data.kids.map((k, i) => (
+                <th key={k.id} style={{ ...thStyle(), color: KID_COLORS[i % KID_COLORS.length].main }}>
+                  {k.name}
+                </th>
+              ))}
+              <th style={thStyle(120)}>備註</th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.map((d) => {
+              const ds = toDS(d);
+              const isToday = d.toDateString() === today.toDateString();
+              const wd = d.getDay();
+              const weekend = wd === 0 || wd === 6;
+              return (
+                <tr key={ds} style={{ background: isToday ? "#FFF9E0" : weekend ? "#FAFAF8" : "#fff" }}>
+                  <td style={{ ...tdStyle, fontWeight: 800, whiteSpace: "nowrap", textAlign: "center" }}>
+                    <div style={{ fontSize: 16 }}>{d.getMonth() + 1}/{d.getDate()}</div>
+                    <div style={{ fontSize: 13, color: isToday ? "#B54A1F" : "#777" }}>
+                      {DAY_LABELS[wd]}{isToday ? " 今天" : ""}
+                    </div>
+                  </td>
+                  {data.kids.map((k) => {
+                    const acts = data.activities
+                      .filter((a) => a.kidId === k.id && activeOnDate(a, d))
+                      .sort((a, b) => toMin(a.start) - toMin(b.start));
+                    return (
+                      <td key={k.id} style={tdStyle}>
+                        {acts.length === 0 && <span style={{ color: "#CCC" }}>—</span>}
+                        {acts.map((a) => {
+                          const al = alertOnDate(a, d);
+                          const w = whoOn(a, al);
+                          const off = al && !al.part;
+                          return (
+                            <div key={a.id} style={{ marginBottom: 5 }}>
+                              <span
+                                style={{
+                                  fontWeight: 700,
+                                  color: off ? "#999" : "#222",
+                                  textDecoration: off ? "line-through" : "none",
+                                }}
+                              >
+                                {a.start ? `${a.start}${a.end ? "\u2013" + a.end : ""} ` : ""}
+                                {a.title}
+                              </span>
+                              {(w.dropoff || w.pickup) && (
+                                <span
+                                  style={{
+                                    color:
+                                      (al && al.part) || w.dropChanged || w.pickChanged
+                                        ? ALERT_COLOR
+                                        : "#666",
+                                  }}
+                                >
+                                  {w.dropoff ? ` 送:${w.dropoff}` : ""}
+                                  {w.pickup ? ` 接:${w.pickup}` : ""}
+                                </span>
+                              )}
+                              {al?.note && (
+                                <div style={{ color: ALERT_COLOR, fontWeight: 700, fontSize: 14 }}>
+                                  ❗{al.note}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </td>
+                    );
+                  })}
+                  <td style={{ ...tdStyle, color: "#8A6D1A" }}>
+                    {dayNotes[ds]
+                      ? dayNotes[ds].split("\n").map((t, i) => <div key={i}>{t}</div>)
+                      : <span style={{ color: "#DDD" }}>—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ fontSize: 13, color: "#999", marginTop: 8 }}>
+        表格可左右滑動。灰色刪除線＝當天停課/請假,紅字為當天特別提醒。
+      </div>
     </div>
   );
 }
@@ -395,9 +543,10 @@ function ShareView({ data }) {
       for (const a of acts) {
         out += `🕒 ${a.start}–${a.end} ${a.title}\n`;
         const alert = alertOnDate(a, date);
-        if (alert) out += `❗ ${alert.note}\n`;
+        const who = whoOn(a, alert);
+        if (alert && alert.note) out += `❗ ${alert.note}\n`;
         if (a.location) out += `📍 ${a.location}\n`;
-        out += `🚗 送:${a.dropoff || "未定"}｜接:${a.pickup || "未定"}\n`;
+        out += `🚗 送:${who.dropoff || "未定"}｜接:${who.pickup || "未定"}\n`;
         if (a.note) out += `⚠️ ${a.note}\n`;
       }
     }
